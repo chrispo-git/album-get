@@ -1,10 +1,12 @@
+import math
 import requests
 import time
 import os
-import subprocess
 import sys
 import yt_dlp
+import time
 import shutil
+from datetime import datetime, timedelta
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, APIC, error, TIT2, TPE2, TALB, TPE1, TYER, TDAT, TRCK, TCON, TORY, TPUB
 
@@ -113,24 +115,41 @@ def tagTracklist(metadata):
         audio.add(TPE2(encoding=3, text=u""+meta["artist-credit"][0]["name"]))   #ALBUMARTIST
         audio.add(TCON(encoding=3, text=u""))    #GENRE
         audio.save(v2_version=3)
-        #audio["title"] = u''+i['title']
-        #audio["title"] = meta["artist-credit"][0]["name"]
 
 def downloadAudio(query, desiredLength):
     print(f"Checking Youtube For '{query}'...")
     if desiredLength[0] == "0" and len(desiredLength) == 5:
         desiredLength = desiredLength[1:]
-    out = os.popen(f'yt-dlp ytsearch3:"{query} Explicit" --get-id --get-duration --ignore-errors')
-    text = out.readlines()
-    out.close()
-    songCandidates = []
-    finalURL = text[0].replace("\n","")
-    for i in range(0,len(text)-1, 2):
-        songCandidates.append([text[i].replace("\n",""), text[i+1].replace("\n","")])
-    print(songCandidates)
-    for i in songCandidates:
-        if i[1] == desiredLength:
-            finalURL = i[0]
+    replaced = False
+    searchNum = 2
+    finalUrl = ""
+    while replaced == False:
+        out = os.popen(f'yt-dlp ytsearch{searchNum}:"{query} Explicit" --get-id --get-duration --ignore-errors')
+        text = out.readlines()
+        out.close()
+        songCandidates = []
+        finalURL = text[0].replace("\n","")
+        for i in range(0,len(text)-1, 2):
+            songCandidates.append([text[i].replace("\n",""), text[i+1].replace("\n","")])
+        print(desiredLength)
+        print(songCandidates)
+        for i in songCandidates:
+            try:
+                t1 = time.mktime(time.strptime(i[1], "%M:%S"))
+                desiredTime = time.mktime(time.strptime(desiredLength, "%M:%S"))
+            except ValueError:
+                continue
+            print(desiredTime-t1)
+            if desiredTime - t1 < 4 and t1 - desiredTime < 4:
+                finalURL = i[0]
+                replaced = True 
+        if replaced == False:
+            searchNum *= 2
+            if searchNum > 16:
+                print("Unable to find video with correct length, defaulting to first video")
+                break
+            else:
+                print(f"Searching first {searchNum} results...")
     os.system(f'yt-dlp -x --audio-format mp3 -o "output/{query}.mp3" https://www.youtube.com/watch?v={finalURL}')
 
 
@@ -152,6 +171,10 @@ while True:
     if exit.lower() == "y":
         break
     entry += 1
+
+start = time.time()
+downloadTrackList(meta)
 tagTracklist(meta)
-#downloadTrackList(meta)
+end = time.time()
+print(f"Finished in {int(end-start)//60}m {int(end-start)%60}s")
 print("Done! :)")

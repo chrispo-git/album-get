@@ -163,8 +163,8 @@ def downloadAudio(query, desiredLength, output_folder, isForceFirst, isVerbose):
             print(f"target time - {desiredLength}")
         for i in songCandidates:
             try:
-                t1 = time.mktime(time.strptime(i[1], "%M:%S"))
-                desiredTime = time.mktime(time.strptime(desiredLength, "%M:%S"))
+                t1 = int((i[1].split(":")[0]*60))+int(i[1].split(":")[1])
+                desiredTime = int((desiredLength.split(":")[0]*60))+int(desiredLength.split(":")[1])
             except ValueError:
                 continue
             if isVerbose:

@@ -163,8 +163,8 @@ def downloadAudio(query, desiredLength, output_folder, isForceFirst, isVerbose):
             print(f"target time - {desiredLength}")
         for i in songCandidates:
             try:
-                t1 = int((i[1].split(":")[0]*60))+int(i[1].split(":")[1])
-                desiredTime = int((desiredLength.split(":")[0]*60))+int(desiredLength.split(":")[1])
+                t1 = sum(int(x) * 60 ** i for i, x in enumerate(reversed(i[1].split(':'))))
+                desiredTime = sum(int(x) * 60 ** i for i, x in enumerate(reversed(desiredLength.split(':'))))
             except ValueError:
                 continue
             if isVerbose:
@@ -188,7 +188,6 @@ def downloadAudio(query, desiredLength, output_folder, isForceFirst, isVerbose):
     if "/" in query:
         query = query.replace("/", "∕")
     os.system(f'yt-dlp -x --audio-format mp3 -o "{output_folder}/{query}.mp3" https://www.youtube.com/watch?v={finalURL}')
-
 
 
 

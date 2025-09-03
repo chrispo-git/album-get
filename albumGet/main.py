@@ -32,8 +32,12 @@ def parseTracks(data):
     allTracks = data["media"][0]["tracks"]
     tracklist = []
     for i in allTracks:
-        seconds = int((int(i["length"])/1000)%60)
-        minutes = int((int(i["length"])/1000)//60)
+        try:
+            seconds = int((int(i["length"])/1000)%60)
+            minutes = int((int(i["length"])/1000)//60)
+        except TypeError:
+            seconds = 0
+            minutes = 0
         trackInfo = {
             "title" : i["title"], 
             "position" : f"{i["position"]:02}", 
@@ -65,10 +69,23 @@ def printTracklist(metadata):
             totalLength = len(i['title'])+15
     print("\n")
     print(middleSpace(metadata["artist-credit"][0]["name"], metadata["title"], totalLength))
-    print("")
+    print(f"")
     print(f"#  Title{getSpace("",totalLength-14)}Length")
     for i in tracklist:
         print(middleSpace(f"{i['position']}{getSpace(i['position'],3)}{i['title']}", i['length'], totalLength))
+    print("")
+    try:
+        print(f"Status : {metadata["status"]}")
+    except KeyError:
+        print(f"Status : Unknown")
+    try:
+        print(f"Country : {metadata["country"]}")
+    except KeyError:
+        print(f"Country : Unknown")
+    try:
+        print(f"Format : {metadata["media"][0]["format"]}")
+    except KeyError:
+        print(f"Format : Unknown")
 def downloadTrackList(metadata, output_folder, isForceFirst, isVerbose):
     if not os.path.isdir(f"{output_folder}"):
         os.mkdir(f"{output_folder}")
@@ -198,8 +215,6 @@ def cli():
     args = parser.parse_args()
     album = args.album
     artist = args.artist
-    print(args.verbose)
-    print(args.force_first)
     query = AlbumQuery(album, artist)
     output_folder = args.output
     if len(query) < 1:

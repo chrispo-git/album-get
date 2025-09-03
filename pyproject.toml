@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "album-get"
+version = "0.1.0"
+description = "Download albums by their name using MusicBrainz API and yt-dlp"
+authors = [{name="Christian Haastrup", email="c.haastrup865@gmail.com"}]
+dependencies = [
+  "requests",
+  "yt-dlp",
+  "mutagen"
+]
+
+[project.scripts]
+album-get = "albumGet.main:cli"

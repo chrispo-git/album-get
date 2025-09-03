@@ -92,7 +92,10 @@ def tagTracklist(metadata):
     tracklist = parseTracks(data)
     
     for i in tracklist:
-        audio = MP3(f"output/{i['title']} - {meta["artist-credit"][0]["name"]}.mp3",ID3=ID3)
+        query = f"{i['title']} - {meta["artist-credit"][0]["name"]}"
+        if "/" in query:
+            query = query.replace("/", "∕")
+        audio = MP3(f"output/{query}.mp3",ID3=ID3)
         audio.pprint()
         audio.tags.add(
             APIC(
@@ -104,7 +107,7 @@ def tagTracklist(metadata):
             )
         )
         audio.save()
-        audio = ID3(f"output/{i['title']} - {meta["artist-credit"][0]["name"]}.mp3")
+        audio = ID3(f"output/{query}.mp3")
         audio.add(TIT2(encoding=3, text=u""+i['title']))    #TITLE
         audio.add(TRCK(encoding=3, text=u""+i['position']))    #TRACK
         audio.add(TPE1(encoding=3, text=u""+meta["artist-credit"][0]["name"]))    #ARTIST
@@ -150,6 +153,8 @@ def downloadAudio(query, desiredLength):
                 break
             else:
                 print(f"Searching first {searchNum} results...")
+    if "/" in query:
+        query = query.replace("/", "∕")
     os.system(f'yt-dlp -x --audio-format mp3 -o "output/{query}.mp3" https://www.youtube.com/watch?v={finalURL}')
 
 

@@ -1,6 +1,13 @@
 import requests
 import time
-import json
+import os
+import subprocess
+import sys
+import yt_dlp
+import shutil
+from mutagen.mp3 import MP3
+from mutagen.id3 import ID3, APIC, error, TIT2, TPE2, TALB, TPE1, TYER, TDAT, TRCK, TCON, TORY, TPUB
+
 headers = {
     "User-Agent": "album-get/0.1.0 (https://github.com/chrispo-git/album-get)"
 }
@@ -59,18 +66,92 @@ def printTracklist(metadata):
     print(f"#  Title{getSpace("",totalLength-14)}Length")
     for i in tracklist:
         print(middleSpace(f"{i['position']}{getSpace(i['position'],3)}{i['title']}", i['length'], totalLength))
+def downloadTrackList(metadata):
+    if not os.path.isdir("output"):
+        os.mkdir("output")
+    else:
+        shutil.rmtree("output")
+        os.mkdir("output")
+    print("Downloading Album Cover...")
+    cover = requests.get(f"https://coverartarchive.org/release/{metadata["id"]}/front").content
+    with open('output/cover.jpg', 'wb') as img:
+        img.write(cover)
+    img.close()
+    time.sleep(1)
+    data = getAlbumData(metadata["id"])
+    tracklist = parseTracks(data)
+    for i in tracklist:
+        downloadAudio(f"{i['title']} - {meta["artist-credit"][0]["name"]}", i['length'])
+
+def tagTracklist(metadata):
+    print("Tagging...")
+    time.sleep(1)
+    data = getAlbumData(metadata["id"])
+    tracklist = parseTracks(data)
+    
+    for i in tracklist:
+        audio = MP3(f"output/{i['title']} - {meta["artist-credit"][0]["name"]}.mp3",ID3=ID3)
+        audio.pprint()
+        audio.tags.add(
+            APIC(
+                encoding=0,
+                mime='image/jpg',
+                type=3,
+                desc=u'Cover',
+                data=open('output/cover.jpg', 'rb').read()
+            )
+        )
+        audio.save()
+        audio = ID3(f"output/{i['title']} - {meta["artist-credit"][0]["name"]}.mp3")
+        audio.add(TIT2(encoding=3, text=u""+i['title']))    #TITLE
+        audio.add(TRCK(encoding=3, text=u""+i['position']))    #TRACK
+        audio.add(TPE1(encoding=3, text=u""+meta["artist-credit"][0]["name"]))    #ARTIST
+        audio.add(TALB(encoding=3, text=u""+meta["title"]))   #ALBUM
+        audio.add(TYER(encoding=3, text=u""+meta["date"])) #YEAR
+        audio.add(TDAT(encoding=3, text=u""+meta["date"])) #YEAR
+        audio.add(TORY(encoding=3, text=u""+meta["date"])) #ORIGYEAR
+        audio.add(TPE2(encoding=3, text=u""+meta["artist-credit"][0]["name"]))   #ALBUMARTIST
+        audio.add(TCON(encoding=3, text=u""))    #GENRE
+        audio.save(v2_version=3)
+        #audio["title"] = u''+i['title']
+        #audio["title"] = meta["artist-credit"][0]["name"]
+
+def downloadAudio(query, desiredLength):
+    print(f"Checking Youtube For '{query}'...")
+    if desiredLength[0] == "0" and len(desiredLength) == 5:
+        desiredLength = desiredLength[1:]
+    out = os.popen(f'yt-dlp ytsearch3:"{query} Explicit" --get-id --get-duration --ignore-errors')
+    text = out.readlines()
+    out.close()
+    songCandidates = []
+    finalURL = text[0].replace("\n","")
+    for i in range(0,len(text)-1, 2):
+        songCandidates.append([text[i].replace("\n",""), text[i+1].replace("\n","")])
+    print(songCandidates)
+    for i in songCandidates:
+        if i[1] == desiredLength:
+            finalURL = i[0]
+    os.system(f'yt-dlp -x --audio-format mp3 -o "output/{query}.mp3" https://www.youtube.com/watch?v={finalURL}')
+
 
 album = input("Album Title:")
 artist = input("Artist:")
 query = AlbumQuery(album, artist)
+if len(query) < 1:
+    print("No Albums Found.")
+    time.sleep(1)
+    sys.exit()
 entry = 0
+meta = getAlbumMeta(query, 0)
 while True:
     if entry >= len(query)-1:
         entry = 0
     meta = getAlbumMeta(query, entry)
-    id = meta["id"]
     printTracklist(meta)
     exit = input("Is this the correct album? [y/n] ")
     if exit.lower() == "y":
         break
     entry += 1
+tagTracklist(meta)
+#downloadTrackList(meta)
+print("Done! :)")

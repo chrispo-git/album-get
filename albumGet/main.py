@@ -69,13 +69,15 @@ def printTracklist(metadata):
     print(f"#  Title{getSpace("",totalLength-14)}Length")
     for i in tracklist:
         print(middleSpace(f"{i['position']}{getSpace(i['position'],3)}{i['title']}", i['length'], totalLength))
-def downloadTrackList(metadata, output_folder):
+def downloadTrackList(metadata, output_folder, isForceFirst, isVerbose):
     if not os.path.isdir(f"{output_folder}"):
         os.mkdir(f"{output_folder}")
     else:
         shutil.rmtree(f"{output_folder}")
         os.mkdir(f"{output_folder}")
     print("Downloading Album Cover...")
+    if isVerbose:
+        print(f"Downloading from https://coverartarchive.org/release/{metadata["id"]}/front")
     cover = requests.get(f"https://coverartarchive.org/release/{metadata["id"]}/front").content
     with open(f'{output_folder}/cover.jpg', 'wb') as img:
         img.write(cover)
@@ -84,7 +86,7 @@ def downloadTrackList(metadata, output_folder):
     data = getAlbumData(metadata["id"])
     tracklist = parseTracks(data)
     for i in tracklist:
-        downloadAudio(f"{i['title']} - {metadata["artist-credit"][0]["name"]}", i['length'], output_folder)
+        downloadAudio(f"{i['title']} - {metadata["artist-credit"][0]["name"]}", i['length'], output_folder, isForceFirst, isVerbose)
 
 def tagTracklist(metadata, output_folder):
     print("Tagging...")
@@ -120,13 +122,15 @@ def tagTracklist(metadata, output_folder):
         audio.add(TCON(encoding=3, text=u""))    #GENRE
         audio.save(v2_version=3)
 
-def downloadAudio(query, desiredLength, output_folder):
+def downloadAudio(query, desiredLength, output_folder, isForceFirst, isVerbose):
     print(f"Checking Youtube For '{query}'...")
     if desiredLength[0] == "0" and len(desiredLength) == 5:
         desiredLength = desiredLength[1:]
     replaced = False
     searchNum = 2
     finalUrl = ""
+    if isForceFirst:
+        searchNum = 1
     while replaced == False:
         out = os.popen(f'yt-dlp ytsearch{searchNum}:"{query} Explicit" --get-id --get-duration --ignore-errors')
         text = out.readlines()
@@ -135,15 +139,28 @@ def downloadAudio(query, desiredLength, output_folder):
         finalURL = text[0].replace("\n","")
         for i in range(0,len(text)-1, 2):
             songCandidates.append([text[i].replace("\n",""), text[i+1].replace("\n","")])
+        if isVerbose:
+            print(f"Candidates for {query}:")
+            for i in range(0,len(songCandidates)):
+                print(f"{i} - {songCandidates[i]}")
+            print(f"target time - {desiredLength}")
         for i in songCandidates:
             try:
                 t1 = time.mktime(time.strptime(i[1], "%M:%S"))
                 desiredTime = time.mktime(time.strptime(desiredLength, "%M:%S"))
             except ValueError:
                 continue
-            if desiredTime - t1 < 4 and t1 - desiredTime < 4:
+            if isVerbose:
+                print(f"Candidate {i[0]} - {i[1]}")
+                print(f"Time Difference {desiredTime - t1}")
+            if (desiredTime - t1 < 4 and t1 - desiredTime < 4) or isForceFirst:
                 finalURL = i[0]
                 replaced = True 
+                print("success!")
+            if isForceFirst:
+                if isVerbose:
+                    print("force first: forced success.")
+                break
         if replaced == False:
             searchNum *= 2
             if searchNum > 16:
@@ -168,9 +185,21 @@ def cli():
         "-o", "--output", default=os.path.join(os.getcwd(), "album-out"),
         help="Save Directory"
     )
+    parser.add_argument(
+        "-ff", "--force-first",
+        action="store_true",
+        help="Forces downloading the first youtube result"
+    )
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Verbose logging"
+    )
     args = parser.parse_args()
     album = args.album
     artist = args.artist
+    print(args.verbose)
+    print(args.force_first)
     query = AlbumQuery(album, artist)
     output_folder = args.output
     if len(query) < 1:
@@ -189,7 +218,7 @@ def cli():
             break
         entry += 1
     start = time.time()
-    downloadTrackList(meta, output_folder)
+    downloadTrackList(meta, output_folder, args.force_first, args.verbose)
     tagTracklist(meta, output_folder)
     end = time.time()
     print(f"Finished in {int(end-start)//60}m {int(end-start)%60}s")

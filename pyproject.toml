@@ -10,7 +10,8 @@ authors = [{name="Christian Haastrup", email="c.haastrup865@gmail.com"}]
 dependencies = [
   "requests",
   "yt-dlp",
-  "mutagen"
+  "mutagen",
+  "ffmpeg"
 ]
 
 [project.scripts]

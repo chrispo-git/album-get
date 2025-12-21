@@ -1,0 +1,42 @@
+name: Build and Draft Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers on v0.1.0, v1.0.0, etc.
+
+permissions:
+  contents: write # Needed to create the release and upload assets
+
+jobs:
+  build-and-draft:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Extract Version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Update pyproject.toml version
+        run: |
+          sed -i "s/version = \"0.0.0\"/version = \"${{ steps.get_version.outputs.VERSION }}\"/" pyproject.toml
+
+      - name: Build distributions
+        run: |
+          python -m pip install build
+          python -m build
+
+      - name: Create Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true # Automatically summarizes your commits
+          files: |
+            dist/*.whl
+            dist/*.tar.gz

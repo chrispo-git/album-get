@@ -302,6 +302,7 @@ def downloadAudio(
     isForceFirst: bool,
     isVerbose: bool,
     browser: str | None = None,
+    cookies_file: str | None = None,
     channel_videos: list[dict] | None = None,
 ):
     print(f"Checking YouTube for '{query}'...")
@@ -377,15 +378,16 @@ def downloadAudio(
         print(f"ERROR: could not find a video for '{query}', skipping.")
         return
 
-    safe_query = query.replace("/", "∕")
+    safe_query  = query.replace("/", "∕")
+    cookie_flag = f'--cookies "{cookies_file}"' if cookies_file else ""
     os.system(
-        f'yt-dlp -x --audio-format mp3'
+        f'yt-dlp -x --audio-format mp3 {cookie_flag}'
         f' -o "{output_folder}/{safe_query}.mp3"'
         f' https://www.youtube.com/watch?v={final_id}'
     )
 
 
-def downloadTrackList(metadata, output_folder, isForceFirst, isVerbose, browser):
+def downloadTrackList(metadata, output_folder, isForceFirst, isVerbose, browser, cookies_file):
     if not os.path.isdir(output_folder):
         os.mkdir(output_folder)
     else:
@@ -422,6 +424,7 @@ def downloadTrackList(metadata, output_folder, isForceFirst, isVerbose, browser)
             isForceFirst,
             isVerbose,
             browser=browser,
+            cookies_file=cookies_file,
             channel_videos=channel_videos,
         )
 
@@ -491,9 +494,12 @@ def cli():
         help="Verbose logging",
     )
     parser.add_argument(
-        "-b", "--browser",
+        "-c", "--cookies",
         default=None,
-        metavar="BROWSER",
+        metavar="FILE",
+        help="Path to a Netscape cookies file for YouTube authentication. "
+             "Export once with: yt-dlp --cookies-from-browser chrome --cookies cookies.txt https://www.youtube.com",
+    )
         help=(
             "Pass cookies from your browser to bypass bot detection. "
             f"Supported: {', '.join(VALID_BROWSERS)}"
@@ -525,7 +531,7 @@ def cli():
         entry += 1
 
     start = time.time()
-    downloadTrackList(meta, args.output, args.force_first, args.verbose, browser)
+    downloadTrackList(meta, args.output, args.force_first, args.verbose, browser, args.cookies)
     tagTracklist(meta, args.output)
     end = time.time()
     elapsed = int(end - start)

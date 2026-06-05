@@ -2,6 +2,7 @@ import requests
 import time
 import os
 import sys
+import yt_dlp
 import argparse
 import shutil
 from mutagen.mp3 import MP3
@@ -500,6 +501,10 @@ def cli():
         help="Path to a Netscape cookies file for YouTube authentication. "
              "Export once with: yt-dlp --cookies-from-browser chrome --cookies cookies.txt https://www.youtube.com",
     )
+    parser.add_argument(
+        "-b", "--browser",
+        default=None,
+        metavar="BROWSER",
         help=(
             "Pass cookies from your browser to bypass bot detection. "
             f"Supported: {', '.join(VALID_BROWSERS)}"
@@ -512,6 +517,42 @@ def cli():
         print(f"Supported browsers: {', '.join(VALID_BROWSERS)}")
         sys.exit(1)
     browser = args.browser.lower() if args.browser else None
+
+    # Resolve cookies file — explicit -c takes priority, then auto-export from -b
+    cookies_file = args.cookies
+    _temp_cookies = None
+    if not cookies_file and browser:
+        import tempfile
+        _temp_cookies = tempfile.NamedTemporaryFile(suffix=".txt", delete=False)
+        _temp_cookies.close()
+        cookies_file = _temp_cookies.name
+        print(f"Exporting cookies from {browser}...")
+        browsers_to_try = [browser] + (["firefox"] if browser != "firefox" else [])
+        for b in browsers_to_try:
+            # Delete the temp file so yt-dlp creates it fresh (it fails reading an empty file)
+            if os.path.exists(cookies_file):
+                os.unlink(cookies_file)
+            try:
+                ydl_opts = {
+                    "cookiesfrombrowser": (b,),
+                    "cookiefile": cookies_file,
+                    "quiet": True,
+                    "no_warnings": True,
+                    "skip_download": True,
+                    "format": "bestaudio/best",
+                    "ignoreerrors": True,
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.extract_info("https://www.youtube.com/watch?v=dQw4w9WgXcQ", download=False)
+            except Exception as e:
+                pass
+            if os.path.exists(cookies_file) and os.path.getsize(cookies_file) > 0:
+                if b != browser:
+                    print(f"Cookie export from {browser} failed, used {b} instead.")
+                break
+        else:
+            print("Warning: cookie export failed, downloads may hit bot detection.")
+            cookies_file = None
 
     query = AlbumQuery(args.album, args.artist)
     if len(query) < 1:
@@ -530,13 +571,17 @@ def cli():
             break
         entry += 1
 
-    start = time.time()
-    downloadTrackList(meta, args.output, args.force_first, args.verbose, browser, args.cookies)
-    tagTracklist(meta, args.output)
-    end = time.time()
-    elapsed = int(end - start)
-    print(f"Finished in {elapsed // 60}m {elapsed % 60}s")
-    print("Done! :)")
+    try:
+        start = time.time()
+        downloadTrackList(meta, args.output, args.force_first, args.verbose, browser, cookies_file)
+        tagTracklist(meta, args.output)
+        end = time.time()
+        elapsed = int(end - start)
+        print(f"Finished in {elapsed // 60}m {elapsed % 60}s")
+        print("Done! :)")
+    finally:
+        if _temp_cookies:
+            os.unlink(_temp_cookies.name)
 
 
 if __name__ == "__main__":
